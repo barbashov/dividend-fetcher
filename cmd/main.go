@@ -3,11 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
+	"smartlab-dividend-fetcher/internal/cache"
 	"smartlab-dividend-fetcher/internal/domain/dividend"
 	"smartlab-dividend-fetcher/internal/domain/tickers"
 	"strings"
 )
+
+const cacheFilename = ".dividends.cache"
 
 func main() {
 	const defaultTickerList = "ticker.list"
@@ -16,6 +21,8 @@ func main() {
 		ticker         string
 		tickerFile     string
 		sortDescending bool
+		noCache        bool
+		verbose        bool
 
 		outputStrategy = dividend.UpcomingOutputStrategy
 		sortField      = dividend.TickerSortField
@@ -24,6 +31,8 @@ func main() {
 	flag.BoolVar(&printTickers, "print-tickers", false, "Print hardcoded ticker map")
 	flag.StringVar(&ticker, "ticker", "", "Fetch all history by specified ticker")
 	flag.StringVar(&tickerFile, "f", defaultTickerList, "Path to file with ticker list, see ticker.list.example")
+	flag.BoolVar(&noCache, "no-cache", false, "Don't read from cache")
+	flag.BoolVar(&verbose, "v", false, "Verbose output")
 
 	flag.Var(
 		&outputStrategy,
@@ -46,15 +55,20 @@ func main() {
 
 	flag.Parse()
 
-	var tickerList []string
+	if !verbose {
+		log.SetOutput(io.Discard)
+	}
+
+	var (
+		err        error
+		tickerList []string
+	)
 	if ticker != "" {
 		tickerList = []string{strings.ToUpper(ticker)}
 	} else {
-		var err error
 		tickerList, err = tickers.ReadTickers(tickerFile)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Can't read ticker file: %v", err)
-			os.Exit(1)
+			log.Fatalf("Can't read ticker file: %v\n", err)
 		}
 	}
 
@@ -63,7 +77,18 @@ func main() {
 		return
 	}
 
-	dividends := dividend.FetchDividends(tickerList...)
+	fetcher := dividend.Fetcher{}
+	cacheOpts := []cache.Option{}
+	if noCache {
+		cacheOpts = append(cacheOpts, cache.TTL(0))
+	}
+	fetcher.Cache, err = cache.NewCache(cacheFilename, cacheOpts...)
+	if err != nil {
+		log.Printf("Error opening cache, will do without it: %v", err)
+		fetcher.Cache = &cache.DummyCache{}
+	}
+
+	dividends := fetcher.FetchDividends(tickerList...)
 	if len(dividends) == 0 {
 		fmt.Printf("No info on dividends")
 		return
