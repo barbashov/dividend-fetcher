@@ -33,6 +33,7 @@ func Output(w io.Writer, divs map[string][]Dividends, outStrat OutputStrategy, s
 		"Dividend",
 		"Price",
 		"Yield",
+		"Error",
 	})
 	t.SetBorder(false)
 
@@ -73,6 +74,10 @@ func filterForOutput(div []Dividends, outStrat OutputStrategy) []Dividends {
 }
 
 func prepareLine(d Dividends) []string {
+	serr := ""
+	if d.Err != nil {
+		serr = fmt.Sprintf("%v", d.Err)
+	}
 	return []string{
 		d.Ticker,
 		d.T_2.Format(TimeLayout),
@@ -81,6 +86,7 @@ func prepareLine(d Dividends) []string {
 		fmt.Sprintf("%.04f", d.Dividend),
 		fmt.Sprintf("%.02f", d.Price),
 		fmt.Sprintf("%.02f%%", d.Yield),
+		serr,
 	}
 }
 

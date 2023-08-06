@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"smartlab-dividend-fetcher/internal/domain/tickers"
 	"strconv"
@@ -11,10 +12,26 @@ import (
 	"time"
 )
 
-func FetchDividends(tickers ...string) map[string][]Dividends {
+type Fetcher struct {
+	Cache Cache
+}
+
+func (f *Fetcher) FetchDividends(tickers ...string) map[string][]Dividends {
 	ret := map[string][]Dividends{}
 	for _, ticker := range tickers {
-		divs := fetchTicker(ticker)
+		divs, err := f.Cache.Get(ticker)
+		if err != nil {
+			log.Printf("No info in %s in cache, will fetch", ticker)
+			divs = f.fetchTicker(ticker)
+			err = f.Cache.Set(ticker, divs)
+			if err != nil {
+				log.Printf("Can't save %s to cache: %v", ticker, err)
+			} else {
+				log.Printf("Saved %s to cache", ticker)
+			}
+		} else {
+			log.Printf("Got %s info from cache", ticker)
+		}
 		if len(divs) == 0 {
 			continue
 		}
@@ -23,7 +40,7 @@ func FetchDividends(tickers ...string) map[string][]Dividends {
 	return ret
 }
 
-func fetchTicker(ticker string) []Dividends {
+func (f *Fetcher) fetchTicker(ticker string) []Dividends {
 	cl := http.Client{}
 	res, err := cl.Get(tickers.BuildFetchLink(ticker))
 	if err != nil {
@@ -80,6 +97,10 @@ func fetchTicker(ticker string) []Dividends {
 		for i, col := range cols {
 			cols[i] = cleanReplacer.Replace(col)
 			cols[i] = strings.TrimSpace(cols[i])
+		}
+
+		if strings.Contains(cols[3], "dividend_canceled") {
+			continue
 		}
 
 		errs := []error{}
