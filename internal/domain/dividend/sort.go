@@ -46,7 +46,10 @@ func SortFunc(field SortField, descending bool) func(a, b Dividends) int {
 	return func(a, b Dividends) int {
 		switch field {
 		case TickerSortField:
-			return strings.Compare(a.Ticker, b.Ticker) * orderModified
+			ret := strings.Compare(a.Ticker, b.Ticker) * orderModified
+			if ret != 0 {
+				return ret // if there's more than one entry for ticker, then fallthrough and sort by date
+			}
 		case T_2SortField:
 			return a.T_2.Compare(b.T_2) * orderModified
 		case ExDividendSortField:

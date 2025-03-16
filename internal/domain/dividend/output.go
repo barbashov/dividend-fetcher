@@ -14,12 +14,14 @@ type OutputStrategy string
 const (
 	UpcomingOutputStrategy OutputStrategy = "upcoming"
 	LastOutputStrategy     OutputStrategy = "last"
+	LastYearOutputStrategy OutputStrategy = "last-year"
 	AllOutputStrategy      OutputStrategy = "all"
 )
 
 var AllOutputStrategies = []string{
 	string(UpcomingOutputStrategy),
 	string(LastOutputStrategy),
+	string(LastYearOutputStrategy),
 	string(AllOutputStrategy),
 }
 
@@ -68,6 +70,18 @@ func filterForOutput(div []Dividends, outStrat OutputStrategy) []Dividends {
 
 	if outStrat == AllOutputStrategy {
 		return div
+	}
+
+	if outStrat == LastYearOutputStrategy {
+		ret := []Dividends{}
+		lastYear := time.Now().Add(-366 * 24 * time.Hour)
+		for _, div := range div {
+			if div.ExDividend.Before(lastYear) {
+				continue
+			}
+			ret = append(ret, div)
+		}
+		return ret
 	}
 
 	return nil

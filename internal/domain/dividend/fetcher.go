@@ -19,6 +19,9 @@ type Fetcher struct {
 func (f *Fetcher) FetchDividends(tickers ...string) map[string][]Dividends {
 	ret := map[string][]Dividends{}
 	for _, ticker := range tickers {
+		if ticker == "" {
+			continue
+		}
 		divs, err := f.Cache.Get(ticker)
 		if err != nil {
 			log.Printf("No info in %s in cache, will fetch", ticker)
@@ -42,7 +45,8 @@ func (f *Fetcher) FetchDividends(tickers ...string) map[string][]Dividends {
 
 func (f *Fetcher) fetchTicker(ticker string) []Dividends {
 	cl := http.Client{}
-	res, err := cl.Get(tickers.BuildFetchLink(ticker))
+	url := tickers.BuildFetchLink(ticker)
+	res, err := cl.Get(url)
 	if err != nil {
 		return []Dividends{{
 			Ticker: ticker,
@@ -54,7 +58,7 @@ func (f *Fetcher) fetchTicker(ticker string) []Dividends {
 	if res.StatusCode != http.StatusOK {
 		return []Dividends{{
 			Ticker: ticker,
-			Err:    fmt.Errorf("invalid HTTP status %d", res.StatusCode),
+			Err:    fmt.Errorf("invalid HTTP status %d fetching %s", res.StatusCode, url),
 		}}
 	}
 
